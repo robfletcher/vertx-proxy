@@ -54,6 +54,8 @@ class VertxProxy {
 
 		System.properties.'http.proxyHost' = InetAddress.localHost.hostAddress
 		System.properties.'http.proxyPort' = port.toString()
+		System.properties.'https.proxyHost' = InetAddress.localHost.hostAddress
+		System.properties.'https.proxyPort' = port.toString()
 	}
 
 	void stop() {
@@ -65,6 +67,8 @@ class VertxProxy {
 
 		System.clearProperty 'http.proxyHost'
 		System.clearProperty 'http.proxyPort'
+		System.clearProperty 'https.proxyHost'
+		System.clearProperty 'https.proxyPort'
 	}
 
 }

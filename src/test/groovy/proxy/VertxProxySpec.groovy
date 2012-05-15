@@ -29,4 +29,17 @@ class VertxProxySpec extends Specification {
 		connection.getHeaderField('Via') == 'Vertx Proxy'
 	}
 
+	void 'can proxy an https request'() {
+		given:
+		def connection = new URL('https://raw.github.com/robfletcher/betamax/master/readme.md').openConnection()
+		connection.readTimeout = 5000
+		connection.connectTimeout = 5000
+
+		expect:
+		connection.inputStream.text.startsWith('# Betamax')
+
+		and:
+		connection.getHeaderField('Via') == 'Vertx Proxy'
+	}
+
 }
