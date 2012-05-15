@@ -20,12 +20,34 @@ class VertxProxy {
 
 	void start() {
 		server = vertx.createHttpServer().requestHandler { request ->
-			println "Proxying request: ${request}"
+			println "Proxying request: ${request.headers['Host']} $request.path"
+			for (header in request.headers) println " - $header.key = $header.value"
 
-		    request.response.chunked = true
-		    request.response.statusCode = 200
-		    request.response << 'O HAI!'
-		    request.response.end()
+			def client = vertx.createHttpClient(host: request.headers['Host'])
+			def onwardRequest = client.request(request.method, request.path) { response ->
+				println "Proxying response $response.statusCode"
+				request.response.chunked = true
+				request.response.statusCode = response.statusCode
+				request.response.headers << response.headers
+				request.response.headers['Via'] = 'Vertx Proxy'
+				response.dataHandler { data ->
+					println "Proxying response body..."
+					request.response << data
+				}
+				response.endHandler {
+					request.response.end()
+				}
+			}
+
+			//onwardRequest.chunked = true
+			onwardRequest.headers << request.headers
+			onwardRequest.headers['Via'] = 'Vertx Proxy'
+			request.dataHandler { data ->
+				onwardRequest << data
+			}
+			request.endHandler {
+				onwardRequest.end()
+			}
 
 		}
 		server.listen(port)

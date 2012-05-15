@@ -6,17 +6,27 @@ import org.vertx.groovy.core.*
 class VertxProxySpec extends Specification {
 
 	@Shared Vertx vertx = Vertx.newVertx()
+	def proxy = new VertxProxy(vertx)
+
+	void setup() {
+		proxy.start()
+	}
+
+	void cleanup() {
+		proxy.stop()
+	}
 	
 	void 'can proxy an http request'() {
 		given:
-		def proxy = new VertxProxy(vertx)
-		proxy.start()
+		def connection = new URL('http://freeside.co/betamax').openConnection()
+		connection.readTimeout = 5000
+		connection.connectTimeout = 5000
 
 		expect:
-		new URL('http://freeside.co/betamax').text == 'O HAI!'
+		connection.inputStream.text.startsWith('<!DOCTYPE html>')
 
-		cleanup:
-		proxy.stop()
+		and:
+		connection.getHeaderField('Via') == 'Vertx Proxy'
 	}
 
 }

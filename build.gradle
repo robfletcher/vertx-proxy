@@ -9,7 +9,7 @@ repositories {
 
 dependencies {
     groovy 'org.codehaus.groovy:groovy:1.8.6'
-    
+
     compile ':vert.x-core'
 
     runtime ':netty'
