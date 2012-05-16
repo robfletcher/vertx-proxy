@@ -85,18 +85,28 @@ class VertxProxy {
 		println "Proxying $request.method to $host..."
 		for (header in request.headers) println " - $header.key = $header.value"
 
-		request.response.statusCode = 200
-		request.response.headers['Proxy-agent'] = 'Vertx Proxy/1.0'
+		request.response.chunked = true
 
-		def client = vertx.createNetClient(host: host, SSL: true, trustAll: true) { socket ->
-			println 'Socket established, pumping data...'
-			createPump socket, request.response
-		}
-
-		request.endHandler {
-			println 'Client closed HTTPS tunnel, closing socket...'
-			client.close()
-			request.response.end()
+		def socketClient = vertx.createNetClient(SSL: true, trustAll: true)
+		socketClient.connect(443, host) { socket ->
+			println 'I have a socket, apparently'
+			request.dataHandler { buffer ->
+				println 'piping request data to target...'
+				socket << buffer
+			}
+			request.endHandler {
+				println 'Client is gone...'
+				socket.close()
+			}
+			socket.dataHandler { buffer ->
+				println 'piping response data back...'
+				request.response << buffer
+			}
+			socket.endHandler {
+				println "I guess we're done..."
+				request.response.end()
+			}
+			request.response << 'HTTP/1.0 200 Ok\r\n\r\n'
 		}
 	}
 
