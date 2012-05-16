@@ -2,6 +2,7 @@ package proxy
 
 import java.util.concurrent.*
 import org.vertx.groovy.core.*
+import static org.vertx.groovy.core.streams.Pump.createPump
 
 class VertxProxy {
 
@@ -20,35 +21,11 @@ class VertxProxy {
 
 	void start() {
 		server = vertx.createHttpServer().requestHandler { request ->
-			println "Proxying request: ${request.headers['Host']} $request.path"
-			for (header in request.headers) println " - $header.key = $header.value"
-
-			def client = vertx.createHttpClient(host: request.headers['Host'])
-			def onwardRequest = client.request(request.method, request.path) { response ->
-				println "Proxying response $response.statusCode"
-				request.response.chunked = true
-				request.response.statusCode = response.statusCode
-				request.response.headers << response.headers
-				request.response.headers['Via'] = 'Vertx Proxy'
-				response.dataHandler { data ->
-					println "Proxying response body..."
-					request.response << data
-				}
-				response.endHandler {
-					request.response.end()
-				}
+			if (request.method == 'CONNECT') {
+				proxyConnect request
+			} else {
+				proxyRequest request
 			}
-
-			//onwardRequest.chunked = true
-			onwardRequest.headers << request.headers
-			onwardRequest.headers['Via'] = 'Vertx Proxy'
-			request.dataHandler { data ->
-				onwardRequest << data
-			}
-			request.endHandler {
-				onwardRequest.end()
-			}
-
 		}
 		server.listen(port)
 
@@ -69,6 +46,58 @@ class VertxProxy {
 		System.clearProperty 'http.proxyPort'
 		System.clearProperty 'https.proxyHost'
 		System.clearProperty 'https.proxyPort'
+	}
+
+	private void proxyRequest(request) {
+		def host = request.headers['Host']
+		println "Proxying request: $request.method $host $request.path"
+		for (header in request.headers) println " - $header.key = $header.value"
+
+		def client = vertx.createHttpClient(host: host)
+		def onwardRequest = client.request(request.method, request.path) { response ->
+			println "Proxying response $response.statusCode"
+			request.response.chunked = true
+			request.response.statusCode = response.statusCode
+			request.response.headers << response.headers
+			request.response.headers['Via'] = 'Vertx Proxy'
+			response.dataHandler { data ->
+				println "Proxying response body..."
+				request.response << data
+			}
+			response.endHandler {
+				request.response.end()
+			}
+		}
+
+		//onwardRequest.chunked = true
+		onwardRequest.headers << request.headers
+		onwardRequest.headers['Via'] = 'Vertx Proxy'
+		request.dataHandler { data ->
+			onwardRequest << data
+		}
+		request.endHandler {
+			onwardRequest.end()
+		}
+	}
+
+	private void proxyConnect(request) {
+		def host = request.headers['Host']
+		println "Proxying $request.method to $host..."
+		for (header in request.headers) println " - $header.key = $header.value"
+
+		request.response.statusCode = 200
+		request.response.headers['Proxy-agent'] = 'Vertx Proxy/1.0'
+
+		def client = vertx.createNetClient(host: host, SSL: true, trustAll: true) { socket ->
+			println 'Socket established, pumping data...'
+			createPump socket, request.response
+		}
+
+		request.endHandler {
+			println 'Client closed HTTPS tunnel, closing socket...'
+			client.close()
+			request.response.end()
+		}
 	}
 
 }

@@ -2,19 +2,16 @@ apply plugin: 'groovy'
 
 repositories {
     mavenCentral()
-    flatDir {
-    	dirs "${vertxHome}/lib/jars"
-    }
+    flatDir { dirs "${vertxHome}/lib/jars" }
 }
 
 dependencies {
     groovy 'org.codehaus.groovy:groovy:1.8.6'
-
-    compile ':vert.x-core'
-
-    runtime ':netty'
-
     testCompile 'org.spockframework:spock-core:0.6-groovy-1.8'
+
+    // jars from ${vertxHome}/lib/jars
+    compile ':vert.x-core'
+    runtime ':netty'
 }
 
 task wrapper(type: Wrapper) {
