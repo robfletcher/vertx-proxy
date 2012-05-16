@@ -18,7 +18,7 @@ class VertxProxySpec extends Specification {
 	
 	void 'can proxy an http request'() {
 		given:
-		def connection = new URL('http://freeside.co/betamax').openConnection()
+		def connection = new URL('http://freeside.co/betamax/').openConnection()
 		connection.readTimeout = 5000
 		connection.connectTimeout = 5000
 
