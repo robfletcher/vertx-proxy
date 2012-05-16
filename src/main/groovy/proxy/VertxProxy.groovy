@@ -90,22 +90,8 @@ class VertxProxy {
 		def socketClient = vertx.createNetClient(SSL: true, trustAll: true)
 		socketClient.connect(443, host) { socket ->
 			println 'I have a socket, apparently'
-			request.dataHandler { buffer ->
-				println 'piping request data to target...'
-				socket << buffer
-			}
-			request.endHandler {
-				println 'Client is gone...'
-				socket.close()
-			}
-			socket.dataHandler { buffer ->
-				println 'piping response data back...'
-				request.response << buffer
-			}
-			socket.endHandler {
-				println "I guess we're done..."
-				request.response.end()
-			}
+			createPump(socket, request.response).start()
+			createPump(request, socket).start()
 			request.response << 'HTTP/1.0 200 Ok\r\n\r\n'
 		}
 	}
