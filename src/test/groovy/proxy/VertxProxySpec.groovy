@@ -1,12 +1,26 @@
 package proxy
 
 import spock.lang.*
+import spock.util.concurrent.*
 import org.vertx.groovy.core.*
 
 class VertxProxySpec extends Specification {
 
 	@Shared Vertx vertx = Vertx.newVertx()
 	def proxy = new VertxProxy(vertx)
+	def responseBody = new BlockingVariable<String>(5)
+	def responseHeaders = new BlockingVariable<Map>(5)
+	def responseHandler = { resp ->
+		println "Got response ${resp.statusCode}..."
+		responseHeaders.set(resp.headers)
+		def responseBuffer = new StringBuilder()
+		resp.bodyHandler { body -> 
+			responseBuffer << body.toString()
+		}
+		resp.endHandler {
+			responseBody.set(responseBuffer.toString()) 
+		}
+	}
 
 	void setup() {
 		proxy.start()
@@ -17,29 +31,29 @@ class VertxProxySpec extends Specification {
 	}
 	
 	void 'can proxy an http request'() {
-		given:
-		def connection = new URL('http://freeside.co/betamax/').openConnection()
-		connection.readTimeout = 5000
-		connection.connectTimeout = 5000
+		when:
+		def request = vertx.createHttpClient(port: VertxProxy.HTTP_PORT).get('/betamax/', responseHandler)
+		request.headers['Host'] = 'freeside.co'
+		request.end()
 
-		expect:
-		connection.inputStream.text.startsWith('<!DOCTYPE html>')
+		then:
+		responseBody.get().startsWith('<!DOCTYPE html>')
 
 		and:
-		connection.getHeaderField('Via') == 'Vertx Proxy'
+		responseHeaders.get()['Via'] == 'Vertx Proxy'
 	}
 
 	void 'can proxy an https request'() {
-		given:
-		def connection = new URL('https://raw.github.com/robfletcher/betamax/master/readme.md').openConnection()
-		connection.readTimeout = 5000
-		connection.connectTimeout = 5000
+		when:
+		def request = vertx.createHttpClient(port: VertxProxy.HTTPS_PORT, SSL: true, trustAll: true).get('/robfletcher/betamax/master/readme.md', responseHandler)
+		request.headers['Host'] = 'raw.github.com'
+		request.end()
 
-		expect:
-		connection.inputStream.text.startsWith('# Betamax')
+		then:
+		responseHeaders.get()['Via'] == 'Vertx Proxy'
 
 		and:
-		connection.getHeaderField('Via') == 'Vertx Proxy'
+		responseBody.get().startsWith('# Betamax')
 	}
 
 }
